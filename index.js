@@ -301,6 +301,64 @@ app.put('/api/expenses/:id', auth, async (req, res) => {
   }
 });
 
+// --- 6. DELETE SATU NOTA BELANJA (Hapus Nota & Isinya) ---
+app.delete('/api/expenses/:id', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Hapus Expense (Parent). 
+    // Karena di models/Expense.js sudah ada "onDelete: 'CASCADE'", 
+    // maka ExpenseItem (anaknya) akan otomatis terhapus oleh database.
+    const deleted = await Expense.destroy({ where: { id } });
+
+    if (!deleted) {
+      return res.status(404).json({ error: "Data belanja tidak ditemukan" });
+    }
+
+    await HistoryLog.create({ action: `Hapus Nota Belanja ID: ${id}`, type: 'EXPENSE' });
+    res.json({ success: true, message: "Nota belanja berhasil dihapus" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- 7. DELETE PER ITEM BARANG (Hapus 1 Item & Update Total) ---
+app.delete('/api/expenses/items/:itemId', auth, async (req, res) => {
+  try {
+    const { itemId } = req.params;
+
+    // 1. Cari dulu itemnya (kita butuh harga & ID Parent-nya)
+    const item = await ExpenseItem.findByPk(itemId);
+    
+    if (!item) {
+      return res.status(404).json({ error: 'Item barang tidak ditemukan' });
+    }
+
+    const parentId = item.ExpenseId; // ID Nota Belanja
+    const priceToRemove = item.price; // Harga item yang mau dihapus
+
+    // 2. Hapus Item tersebut
+    await item.destroy();
+
+    // 3. Update Total Harga di Parent (Expense) biar sinkron
+    const parentExpense = await Expense.findByPk(parentId);
+    if (parentExpense) {
+      // Kurangi total belanja dengan harga item yang dihapus
+      const newTotal = (parentExpense.totalCost || 0) - priceToRemove;
+      
+      // Update ke database
+      await parentExpense.update({ totalCost: newTotal < 0 ? 0 : newTotal });
+    }
+
+    res.json({ success: true, message: "Item berhasil dihapus & Total harga diperbarui" });
+
+  } catch (error) {
+    console.error("Error delete item:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // --- IMPORT EXCEL ORDERS (FIX NAMA PEDAS BON CABE) ---
 app.post('/api/orders/import', auth, upload.single('file'), async (req, res) => {
   try {
