@@ -9,11 +9,25 @@ const env = process.env.NODE_ENV || 'development';
 const config = require(__dirname + '/../config/database.js')[env];
 const db = {};
 
+// --- 1. TAMBAHKAN INI (Load driver pg manual) ---
+const pg = require('pg'); 
+// ------------------------------------------------
+
 let sequelize;
 if (config.use_env_variable) {
-  sequelize = new Sequelize(process.env[config.use_env_variable], config);
+  sequelize = new Sequelize(process.env[config.use_env_variable], {
+    ...config,
+    // --- 2. TAMBAHKAN INI (Paksa pakai driver pg) ---
+    dialectModule: pg
+    // ------------------------------------------------
+  });
 } else {
-  sequelize = new Sequelize(config.database, config.username, config.password, config);
+  sequelize = new Sequelize(config.database, config.username, config.password, {
+    ...config,
+    // --- 2. TAMBAHKAN INI (Paksa pakai driver pg) ---
+    dialectModule: pg
+    // ------------------------------------------------
+  });
 }
 
 fs
