@@ -6,27 +6,39 @@ const Sequelize = require('sequelize');
 const process = require('process');
 const basename = path.basename(__filename);
 const env = process.env.NODE_ENV || 'development';
+// Kita tetap load config buat development lokal
 const config = require(__dirname + '/../config/database.js')[env];
 const db = {};
 
-// --- 1. TAMBAHKAN INI (Load driver pg manual) ---
-const pg = require('pg'); 
-// ------------------------------------------------
+// 1. Load Driver PG Manual (Wajib buat Vercel)
+const pg = require('pg');
 
 let sequelize;
-if (config.use_env_variable) {
+
+// 2. LOGIKA BARU: Cek langsung DATABASE_URL
+// Kalau ada DATABASE_URL (artinya di Vercel/Production), langsung pakai!
+if (process.env.DATABASE_URL) {
+  sequelize = new Sequelize(process.env.DATABASE_URL, {
+    dialect: 'postgres',
+    dialectModule: pg, // Paksa pakai pg
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false // Supaya gak error SSL di Neon
+      }
+    }
+  });
+} 
+// Kalau gak ada (artinya di Laptop/Lokal), pakai config biasa
+else if (config.use_env_variable) {
   sequelize = new Sequelize(process.env[config.use_env_variable], {
     ...config,
-    // --- 2. TAMBAHKAN INI (Paksa pakai driver pg) ---
     dialectModule: pg
-    // ------------------------------------------------
   });
 } else {
   sequelize = new Sequelize(config.database, config.username, config.password, {
     ...config,
-    // --- 2. TAMBAHKAN INI (Paksa pakai driver pg) ---
     dialectModule: pg
-    // ------------------------------------------------
   });
 }
 
