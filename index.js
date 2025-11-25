@@ -587,6 +587,20 @@ app.delete('/api/expenses/reset/all', auth, async (req, res) => {
   }
 });
 
+// 8. NOTIFICATIONS ENDPOINT (Buat Polling)
+app.get('/api/notifications', auth, async (req, res) => {
+  try {
+    // Ambil 50 log terakhir
+    const logs = await HistoryLog.findAll({ 
+      limit: 50, 
+      order: [['createdAt', 'DESC']] 
+    });
+    res.json(logs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Setup Port
 const PORT = process.env.PORT || 5000;
 
