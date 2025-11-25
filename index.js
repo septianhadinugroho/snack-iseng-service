@@ -495,28 +495,6 @@ async function saveFullExpense(expData, items) {
     }
 }
 
-// Helper Function buat Simpan Expense
-async function saveFullExpense(expData, items) {
-    let totalCost = 0;
-    items.forEach(i => totalCost += i.price);
-
-    const expense = await Expense.create({
-        date: expData.date,
-        totalCost,
-        yieldEstimate: expData.yieldEstimate,
-        description: `Import Excel (Hasil: ${expData.yieldEstimate})`
-    });
-
-    for (const item of items) {
-        await ExpenseItem.create({
-            ExpenseId: expense.id,
-            name: item.name,
-            quantity: item.quantity,
-            price: item.price
-        });
-    }
-}
-
 // --- RESET SEMUA ORDER (KHUSUS DEV) ---
 app.delete('/api/orders/reset/all', auth, async (req, res) => {
   try {
@@ -553,6 +531,14 @@ app.delete('/api/expenses/reset/all', auth, async (req, res) => {
 
 // Setup Port
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, async () => {
-  console.log(`Server running on port ${PORT}`);
-});
+
+// Cek apakah sedang running di local atau production (Vercel)
+if (require.main === module) {
+    // Jika dijalankan manual (node index.js), jalankan listen
+    app.listen(PORT, async () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+}
+
+// PENTING: Export app untuk Vercel
+module.exports = app;
