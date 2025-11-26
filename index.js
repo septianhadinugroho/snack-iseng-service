@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-const { User, Product, Order, OrderItem, Expense, ExpenseItem, HistoryLog, Sequelize } = require('./models');
+const webPush = require('web-push');
+const { User, Product, Order, OrderItem, Expense, ExpenseItem, HistoryLog, Subscription, Sequelize } = require('./models');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
@@ -21,7 +22,64 @@ const auth = (req, res, next) => {
   } catch (e) { res.status(403).json({ error: 'Invalid token' }); }
 };
 
+// Setup Web Push
+webPush.setVapidDetails(
+  process.env.VAPID_EMAIL || 'mailto:test@test.com',
+  process.env.VAPID_PUBLIC_KEY,
+  process.env.VAPID_PRIVATE_KEY
+);
+
+// --- Helper Function Kirim Notif ke Semua Orang ---
+const broadcastNotification = async (title, body, url = '/') => {
+  const subscriptions = await Subscription.findAll();
+  
+  const notificationPayload = JSON.stringify({ title, body, url });
+
+  subscriptions.forEach(sub => {
+    const pushConfig = {
+      endpoint: sub.endpoint,
+      keys: sub.keys
+    };
+
+    webPush.sendNotification(pushConfig, notificationPayload)
+      .catch(err => {
+        console.error("Gagal kirim notif", err);
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          // Kalau endpoint sudah basi/unregistered, hapus dari DB
+          Subscription.destroy({ where: { endpoint: sub.endpoint } });
+        }
+      });
+  });
+};
+
 // --- Routes ---
+
+// 1. Endpoint untuk Frontend ambil Public Key
+app.get('/api/vapid-public-key', (req, res) => {
+  res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
+});
+
+// 2. Endpoint Subscribe (Frontend lapor diri mau dikirimin notif)
+app.post('/api/subscribe', async (req, res) => {
+  const subscription = req.body;
+  try {
+    // Simpan atau Update jika sudah ada
+    const [sub, created] = await Subscription.findOrCreate({
+      where: { endpoint: subscription.endpoint },
+      defaults: { keys: subscription.keys }
+    });
+    
+    if (!created) {
+        sub.keys = subscription.keys;
+        await sub.save();
+    }
+    
+    res.status(201).json({});
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Gagal subscribe' });
+  }
+});
 
 // 1. Login
 app.post('/api/login', async (req, res) => {
@@ -105,11 +163,15 @@ app.post('/api/orders', auth, async (req, res) => {
     });
   }
 
-  // [PERBAIKAN] Log Lebih Detail untuk Notifikasi
+  // [LOGIC NOTIFIKASI REAL-TIME]
   const itemDetails = items.map(i => `${i.productName} (${i.quantity})`).join(', ');
   const logMsg = `${customerName} - ${itemDetails} - Rp ${totalPrice.toLocaleString()}`;
 
   await HistoryLog.create({ action: logMsg, type: 'ORDER' });
+
+  // ==> TAMBAHAN: KIRIM NOTIFIKASI PUSH <==
+  broadcastNotification('Order Baru Masuk! 💰', `${customerName} beli ${totalItems} item`, '/orders');
+
   res.json({ success: true });
 });
 
@@ -139,11 +201,17 @@ app.delete('/api/orders/:id', auth, async (req, res) => {
 
     await Order.destroy({ where: { id: req.params.id } });
     
-    // Log Detail Hapus
     await HistoryLog.create({ action: `Hapus Order: ${name}`, type: 'ORDER' });
+
+    // [TAMBAHAN NOTIFIKASI]
+    broadcastNotification(
+        'Order Dihapus 🗑️', 
+        `Order atas nama ${name} telah dihapus dari sistem.`, 
+        '/orders'
+    );
+
     res.json({ success: true });
 });
-
 // --- CREATE EXPENSE (POST) ---
 app.post('/api/expenses', auth, async (req, res) => {
   try {
@@ -185,6 +253,9 @@ app.post('/api/expenses', auth, async (req, res) => {
       type: 'EXPENSE' 
     });
 
+    // ==> TAMBAHAN: KIRIM NOTIFIKASI PUSH <==
+    broadcastNotification('Belanja Stok Baru 🛒', `Total: Rp ${totalCost.toLocaleString()}`, '/expenses');
+    
     res.json({ success: true, message: "Belanja berhasil dicatat!" });
 
   } catch (error) {
@@ -243,6 +314,14 @@ app.put('/api/orders/:id', auth, async (req, res) => {
     }
 
     await HistoryLog.create({ action: `Edit Order: ${customerName}`, type: 'ORDER' });
+    
+    // [TAMBAHAN NOTIFIKASI]
+    broadcastNotification(
+        'Order Diupdate ✏️', 
+        `Order atas nama ${customerName} telah diubah. Total: Rp ${totalPrice.toLocaleString()}`, 
+        '/orders'
+    );
+
     res.json({ success: true });
 
   } catch (error) {
@@ -277,6 +356,14 @@ app.put('/api/expenses/:id', auth, async (req, res) => {
     }
     
     await HistoryLog.create({ action: `Edit Belanja ID: ${id}`, type: 'EXPENSE' });
+
+    // [TAMBAHAN NOTIFIKASI]
+    broadcastNotification(
+        'Nota Belanja Diupdate ✏️', 
+        `Data belanja ID ${id} diubah. Total baru: Rp ${totalCost.toLocaleString()}`, 
+        '/expenses'
+    );
+
     res.json({ success: true });
 
   } catch (error) {
@@ -296,6 +383,14 @@ app.delete('/api/expenses/:id', auth, async (req, res) => {
     }
 
     await HistoryLog.create({ action: `Hapus Nota Belanja ID: ${id}`, type: 'EXPENSE' });
+
+    // [TAMBAHAN NOTIFIKASI]
+    broadcastNotification(
+        'Nota Belanja Dihapus 🗑️', 
+        `Nota belanja ID ${id} telah dihapus permanen.`, 
+        '/expenses'
+    );
+
     res.json({ success: true, message: "Nota belanja berhasil dihapus" });
   } catch (error) {
     console.error(error);
