@@ -1,28 +1,34 @@
 require('dotenv').config();
-const pg = require('pg'); // <--- TAMBAHAN 1: Load driver pg manual
+const pg = require('pg');
 
 module.exports = {
   development: {
-    username: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    host: process.env.DB_HOST,
+    // Ganti pengambilan manual dengan variable ini
+    use_env_variable: 'DATABASE_URL', 
     dialect: "postgres",
-    port: process.env.DB_PORT,
-    dialectModule: pg // <--- Paksa dev pake pg
+    dialectModule: pg,
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false // Neon membutuhkan SSL
+      }
+    }
   },
   test: {
-    username: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    host: process.env.DB_HOST,
+    use_env_variable: 'DATABASE_URL',
     dialect: "postgres",
-    dialectModule: pg // <--- Paksa test pake pg
+    dialectModule: pg,
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    }
   },
   production: {
     use_env_variable: "DATABASE_URL",
     dialect: "postgres",
-    dialectModule: pg, // <--- TAMBAHAN 2: INI WAJIB BUAT VERCEL
+    dialectModule: pg,
     dialectOptions: {
       ssl: {
         require: true,
