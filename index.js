@@ -52,6 +52,32 @@ const broadcastNotification = async (title, body, url = '/') => {
   });
 };
 
+// --- Middleware Demo Guard ---
+// Ini berfungsi sebagai "satpam" khusus akun demo
+const demoGuard = (req, res, next) => {
+  // 1. Cek apakah user yang login adalah 'demo'
+  if (req.user && req.user.username === 'demo') {
+    
+    // 2. Jika requestnya adalah MEMBACA data (GET), biarkan lewat
+    if (req.method === 'GET') {
+      return next();
+    }
+
+    // 3. Jika requestnya MENGUBAH data (POST, PUT, DELETE), cegat!
+    console.log(`[DEMO] Request ${req.method} dicegat untuk user demo.`);
+    
+    // Kirim respon "Pura-pura Sukses" agar frontend tidak error
+    return res.json({ 
+      success: true, 
+      message: "Mode Demo: Perubahan berhasil (Simulasi)",
+      id: Math.floor(Math.random() * 1000) // ID palsu biar frontend seneng
+    });
+  }
+
+  // 4. Kalau bukan user demo, lanjut proses asli ke database
+  next();
+};
+
 // --- Routes ---
 
 // 1. Endpoint untuk Frontend ambil Public Key
@@ -128,7 +154,7 @@ app.get('/api/products', auth, async (req, res) => {
 });
 
 // --- CREATE ORDER (POST) ---
-app.post('/api/orders', auth, async (req, res) => {
+app.post('/api/orders', auth, demoGuard, async (req, res) => {
   const adminId = req.user.id;
   const adminName = req.user.username;
 
@@ -187,14 +213,14 @@ app.get('/api/orders', auth, async (req, res) => {
 });
 
 // Update Harga Produk
-app.put('/api/products/:id', auth, async (req, res) => {
+app.put('/api/products/:id', auth, demoGuard, async (req, res) => {
     const { price } = req.body;
     await Product.update({ price }, { where: { id: req.params.id } });
     res.json({ success: true });
 });
 
 // --- DELETE ORDER ---
-app.delete('/api/orders/:id', auth, async (req, res) => {
+app.delete('/api/orders/:id', auth, demoGuard, async (req, res) => {
     // Ambil detail order sebelum dihapus untuk log
     const order = await Order.findByPk(req.params.id);
     const name = order ? order.customerName : 'Unknown';
@@ -213,7 +239,7 @@ app.delete('/api/orders/:id', auth, async (req, res) => {
     res.json({ success: true });
 });
 // --- CREATE EXPENSE (POST) ---
-app.post('/api/expenses', auth, async (req, res) => {
+app.post('/api/expenses', auth, demoGuard, async (req, res) => {
   try {
     const { date, items, yieldEstimate, description } = req.body;
 
@@ -278,7 +304,7 @@ app.get('/api/expenses', auth, async (req, res) => {
 });
 
 // --- UPDATE ORDER (PUT) ---
-app.put('/api/orders/:id', auth, async (req, res) => {
+app.put('/api/orders/:id', auth, demoGuard, async (req, res) => {
   try {
     const { id } = req.params;
     const { customerName, items, paymentMethod, isPaid, isReceived, description, date } = req.body;
@@ -330,7 +356,7 @@ app.put('/api/orders/:id', auth, async (req, res) => {
 });
 
 // --- UPDATE EXPENSE (PUT) ---
-app.put('/api/expenses/:id', auth, async (req, res) => {
+app.put('/api/expenses/:id', auth, demoGuard, async (req, res) => {
   try {
     const { id } = req.params;
     const { date, items, yieldEstimate, description } = req.body;
@@ -373,7 +399,7 @@ app.put('/api/expenses/:id', auth, async (req, res) => {
 });
 
 // --- DELETE EXPENSE ---
-app.delete('/api/expenses/:id', auth, async (req, res) => {
+app.delete('/api/expenses/:id', auth, demoGuard, async (req, res) => {
   try {
     const { id } = req.params;
     const deleted = await Expense.destroy({ where: { id } });
@@ -399,7 +425,7 @@ app.delete('/api/expenses/:id', auth, async (req, res) => {
 });
 
 // --- DELETE EXPENSE ITEM ---
-app.delete('/api/expenses/items/:itemId', auth, async (req, res) => {
+app.delete('/api/expenses/items/:itemId', auth, demoGuard, async (req, res) => {
   try {
     const { itemId } = req.params;
     const item = await ExpenseItem.findByPk(itemId);
@@ -428,7 +454,7 @@ app.delete('/api/expenses/items/:itemId', auth, async (req, res) => {
 });
 
 // --- IMPORT ORDERS ---
-app.post('/api/orders/import', auth, upload.single('file'), async (req, res) => {
+app.post('/api/orders/import', auth, demoGuard, upload.single('file'), async (req, res) => {
   try {
     const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
@@ -523,7 +549,7 @@ app.post('/api/orders/import', auth, upload.single('file'), async (req, res) => 
 });
 
 // --- IMPORT EXPENSES ---
-app.post('/api/expenses/import', auth, upload.single('file'), async (req, res) => {
+app.post('/api/expenses/import', auth, demoGuard, upload.single('file'), async (req, res) => {
   try {
     const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
     const data = xlsx.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: 0, raw: false });
@@ -600,7 +626,7 @@ async function saveFullExpense(expData, items) {
 }
 
 // --- RESET DATA (DEV) ---
-app.delete('/api/orders/reset/all', auth, async (req, res) => {
+app.delete('/api/orders/reset/all', auth, demoGuard, async (req, res) => {
   try {
     await Order.destroy({ where: {}, truncate: true, cascade: true });
     await HistoryLog.destroy({ where: { type: 'ORDER' } });
@@ -611,7 +637,7 @@ app.delete('/api/orders/reset/all', auth, async (req, res) => {
   }
 });
 
-app.delete('/api/expenses/reset/all', auth, async (req, res) => {
+app.delete('/api/expenses/reset/all', auth, demoGuard, async (req, res) => {
   try {
     await Expense.destroy({ where: {}, truncate: true, cascade: true });
     await HistoryLog.destroy({ where: { type: 'EXPENSE' } });
@@ -636,7 +662,7 @@ app.get('/api/notifications', auth, async (req, res) => {
 });
 
 // [BARU] Endpoint Delete Notif
-app.delete('/api/notifications/:id', auth, async (req, res) => {
+app.delete('/api/notifications/:id', auth, demoGuard, async (req, res) => {
     try {
         await HistoryLog.destroy({ where: { id: req.params.id } });
         res.json({ success: true });

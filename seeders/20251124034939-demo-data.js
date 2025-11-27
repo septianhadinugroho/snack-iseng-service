@@ -12,15 +12,16 @@ module.exports = {
       { name: 'Pedas Bon Cabe', price: 5000, createdAt: new Date(), updatedAt: new Date() }
     ], {});
 
-    // 2. Insert Admin User (Password: admin123)
-    const password = await bcrypt.hash('admin123', 10);
-    const users = [
-      { username: 'asep', password, role: 'admin', createdAt: new Date(), updatedAt: new Date() },
-      { username: 'remu', password, role: 'admin', createdAt: new Date(), updatedAt: new Date() },
-      { username: 'ucup', password, role: 'admin', createdAt: new Date(), updatedAt: new Date() },
-      { username: 'hasbi', password, role: 'admin', createdAt: new Date(), updatedAt: new Date() }
-    ];
-    await queryInterface.bulkInsert('Users', users, {});
+    const demoPassword = await bcrypt.hash('demo123', 10);
+    await queryInterface.bulkInsert('Users', [
+      { 
+        username: 'demo', 
+        password: demoPassword, 
+        role: 'admin', 
+        createdAt: new Date(), 
+        updatedAt: new Date() 
+      }
+    ], {});
   },
 
   async down (queryInterface, Sequelize) {
