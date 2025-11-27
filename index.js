@@ -7,7 +7,6 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const xlsx = require('xlsx');
 
-const { apiReference } = require('@scalar/express-api-reference');
 const swaggerDocument = require('./swagger.json');
 
 const upload = multer({ storage: multer.memoryStorage() }); 
@@ -16,15 +15,26 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use(
-  '/docs',
-  apiReference({
-    theme: 'deepSpace',
-    spec: {
-      content: swaggerDocument,
-    },
-  })
-);
+app.use('/docs', async (req, res, next) => {
+  try {
+    // Kita import Scalar hanya saat route ini diakses (Lazy Loading)
+    const { apiReference } = await import('@scalar/express-api-reference');
+    
+    // Konfigurasi Scalar
+    const handler = apiReference({
+      theme: 'deepSpace',
+      spec: {
+        content: swaggerDocument,
+      },
+    });
+
+    // Jalankan handler Scalar
+    return handler(req, res, next);
+  } catch (err) {
+    console.error("Gagal memuat Scalar:", err);
+    res.status(500).send("Gagal memuat dokumentasi API.");
+  }
+});
 
 // --- Middleware Auth ---
 const auth = (req, res, next) => {

@@ -129,6 +129,14 @@ Semua endpoint (kecuali Login & Subscribe) membutuhkan header:
 
 > **Catatan Demo Guard:** Jika login menggunakan user `demo`, semua request bertanda ✅ akan mengembalikan status "Sukses" palsu dan tidak akan merubah data di database.
 
+## 📖 Dokumentasi API Interaktif
+
+Project ini dilengkapi dengan dokumentasi API interaktif menggunakan **Scalar**.
+Anda bisa mencoba semua endpoint langsung dari browser tanpa perlu Postman.
+
+* **URL:** `http://localhost:5000/docs` (Local)
+* **Production:** `https://snack-iseng-service.vercel.app/docs`
+
 ## ☁️ Deployment (Vercel)
 
 Project ini sudah dikonfigurasi (`vercel.json`) untuk deploy ke Vercel.
