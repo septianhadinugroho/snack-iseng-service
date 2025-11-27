@@ -6,11 +6,25 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const xlsx = require('xlsx');
+
+const { apiReference } = require('@scalar/express-api-reference');
+const swaggerDocument = require('./swagger.json');
+
 const upload = multer({ storage: multer.memoryStorage() }); 
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+app.use(
+  '/docs',
+  apiReference({
+    theme: 'deepSpace',
+    spec: {
+      content: swaggerDocument,
+    },
+  })
+);
 
 // --- Middleware Auth ---
 const auth = (req, res, next) => {

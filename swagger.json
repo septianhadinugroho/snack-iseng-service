@@ -1,0 +1,382 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Snack Iseng Service API",
+    "description": "API Documentation for Snack Iseng Service backend.\n\n**Demo Mode Note:** If logged in as user `demo`, CREATE/UPDATE/DELETE operations are simulated (Database remains unchanged).",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000",
+      "description": "Local Development Server"
+    },
+    {
+      "url": "https://snack-iseng-service.vercel.app",
+      "description": "Production Server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "username": { "type": "string", "example": "demo" },
+          "password": { "type": "string", "example": "demo123" }
+        },
+        "required": ["username", "password"]
+      },
+      "OrderRequest": {
+        "type": "object",
+        "properties": {
+          "customerName": { "type": "string", "example": "Budi Santoso" },
+          "date": { "type": "string", "format": "date", "example": "2025-11-27" },
+          "paymentMethod": { "type": "string", "enum": ["QRIS", "Cash"], "example": "QRIS" },
+          "isPaid": { "type": "boolean", "example": true },
+          "isReceived": { "type": "boolean", "example": false },
+          "description": { "type": "string", "example": "Titip di satpam" },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "productId": { "type": "integer", "example": 1 },
+                "productName": { "type": "string", "example": "Balado" },
+                "quantity": { "type": "integer", "example": 2 }
+              }
+            }
+          }
+        }
+      },
+      "ExpenseRequest": {
+        "type": "object",
+        "properties": {
+          "date": { "type": "string", "format": "date", "example": "2025-11-27" },
+          "yieldEstimate": { "type": "integer", "description": "Estimated packs produced", "example": 50 },
+          "description": { "type": "string", "example": "Weekly grocery shopping" },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "example": "Cooking Oil" },
+                "quantity": { "type": "string", "example": "2 Liters" },
+                "price": { "type": "integer", "example": 35000 }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    { "name": "Auth", "description": "Authentication & Public Keys" },
+    { "name": "Dashboard", "description": "Main Dashboard Statistics" },
+    { "name": "Orders", "description": "Order Management" },
+    { "name": "Products", "description": "Products & Pricing" },
+    { "name": "Expenses", "description": "Expense Management" },
+    { "name": "Notifications", "description": "Activity Logs & Web Push" }
+  ],
+  "paths": {
+    "/api/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login User/Admin",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful, returns JWT token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": { "type": "string" },
+                    "user": { "type": "object" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/vapid-public-key": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Get VAPID Public Key",
+        "description": "Used by frontend to register service worker for push notifications",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    },
+    "/api/subscribe": {
+      "post": {
+        "tags": ["Notifications"],
+        "summary": "Subscribe Device for Push Notification",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "endpoint": { "type": "string" },
+                  "keys": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Subscribed" }
+        }
+      }
+    },
+    "/api/dashboard": {
+      "get": {
+        "tags": ["Dashboard"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "Get dashboard stats",
+        "responses": {
+          "200": {
+            "description": "Stats, chart data, and history logs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cards": { "type": "object" },
+                    "chart": { "type": "array" },
+                    "history": { "type": "array" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/products": {
+      "get": {
+        "tags": ["Products"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "List all products",
+        "responses": { "200": { "description": "List of products and variant stats" } }
+      }
+    },
+    "/api/products/{id}": {
+      "put": {
+        "tags": ["Products"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "Update product price",
+        "parameters": [
+          { "in": "path", "name": "id", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "price": { "type": "integer" } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Price updated" } }
+      }
+    },
+    "/api/orders": {
+      "get": {
+        "tags": ["Orders"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "Get all orders",
+        "responses": { "200": { "description": "Array of orders" } }
+      },
+      "post": {
+        "tags": ["Orders"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "Create new order",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/OrderRequest" } }
+          }
+        },
+        "responses": { "200": { "description": "Order created" } }
+      }
+    },
+    "/api/orders/{id}": {
+      "put": {
+        "tags": ["Orders"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "Update order",
+        "parameters": [
+          { "in": "path", "name": "id", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/OrderRequest" } }
+          }
+        },
+        "responses": { "200": { "description": "Order updated" } }
+      },
+      "delete": {
+        "tags": ["Orders"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "Delete order",
+        "parameters": [
+          { "in": "path", "name": "id", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Order deleted" } }
+      }
+    },
+    "/api/orders/import": {
+      "post": {
+        "tags": ["Orders"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "Import orders from Excel",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Import successful" } }
+      }
+    },
+    "/api/orders/reset/all": {
+      "delete": {
+        "tags": ["Orders"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "DELETE ALL ORDERS (Reset)",
+        "responses": { "200": { "description": "All orders deleted" } }
+      }
+    },
+    "/api/expenses": {
+      "get": {
+        "tags": ["Expenses"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "Get all expenses",
+        "responses": { "200": { "description": "Array of expenses" } }
+      },
+      "post": {
+        "tags": ["Expenses"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "Create new expense note",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ExpenseRequest" } }
+          }
+        },
+        "responses": { "200": { "description": "Expense created" } }
+      }
+    },
+    "/api/expenses/{id}": {
+      "put": {
+        "tags": ["Expenses"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "Update expense note",
+        "parameters": [
+          { "in": "path", "name": "id", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ExpenseRequest" } }
+          }
+        },
+        "responses": { "200": { "description": "Expense updated" } }
+      },
+      "delete": {
+        "tags": ["Expenses"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "Delete expense note",
+        "parameters": [
+          { "in": "path", "name": "id", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Expense deleted" } }
+      }
+    },
+    "/api/expenses/items/{itemId}": {
+      "delete": {
+        "tags": ["Expenses"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "Delete single item in expense note",
+        "parameters": [
+          { "in": "path", "name": "itemId", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Item deleted, total updated" } }
+      }
+    },
+    "/api/expenses/import": {
+      "post": {
+        "tags": ["Expenses"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "Import expenses from Excel",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Import successful" } }
+      }
+    },
+    "/api/expenses/reset/all": {
+      "delete": {
+        "tags": ["Expenses"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "DELETE ALL EXPENSES (Reset)",
+        "responses": { "200": { "description": "All expenses deleted" } }
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "tags": ["Notifications"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "Get activity logs",
+        "responses": { "200": { "description": "List history logs" } }
+      }
+    },
+    "/api/notifications/{id}": {
+      "delete": {
+        "tags": ["Notifications"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "Delete activity log",
+        "parameters": [
+          { "in": "path", "name": "id", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Log deleted" } }
+      }
+    }
+  }
+}
